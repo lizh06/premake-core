@@ -9,5 +9,6 @@
 		-- "monodevelop",
 		-- "codelite",
 		-- "d",
+		compilationunit,
 		ninja,
 	}
