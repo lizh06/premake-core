@@ -5,9 +5,9 @@
 --
 
 	return {
-		ninja,
 		-- "xcode",
 		-- "monodevelop",
 		-- "codelite",
 		-- "d",
+		ninja,
 	}
