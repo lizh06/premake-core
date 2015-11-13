@@ -405,6 +405,8 @@
 				m.moduleDefinitionFile,
 				m.treatLinkerWarningAsErrors,
 				m.ignoreDefaultLibraries,
+				m.largeAddressAware,
+				m.targetMachine,
 				m.additionalLinkOptions,
 			}
 		end
@@ -429,6 +431,7 @@
 		if cfg.kind == p.STATICLIB then
 			return {
 				m.treatLinkerWarningAsErrors,
+				m.targetMachine,
 				m.additionalLinkOptions,
 			}
 		else
@@ -725,7 +728,7 @@
 
 	m.elements.ResourceCompileFile = function(cfg, file)
 		return {}
-						end
+	end
 
 	m.elements.ResourceCompileFileCfg = function(fcfg, condition)
 		return {
@@ -879,11 +882,6 @@
 	function m.projectReferences(prj)
 		local refs = project.getdependencies(prj, 'linkOnly')
 		if #refs > 0 then
-			-- sort dependencies by uuid.
-			table.sort(refs, function(a,b)
-				return a.uuid < b.uuid
-			end)
-
 			p.push('<ItemGroup>')
 			for _, ref in ipairs(refs) do
 				local relpath = vstudio.path(prj, vstudio.projectfile(ref))
@@ -946,6 +944,25 @@
 			if #dirs > 0 then
 				m.element("AdditionalUsingDirectories", nil, "%s;%%(AdditionalUsingDirectories)", table.concat(dirs, ";"))
 			end
+		end
+	end
+
+
+	function m.largeAddressAware(cfg)
+		if (cfg.largeaddressaware == true) then
+			m.element("LargeAddressAware", nil, 'true')
+		end
+	end
+
+
+	function m.targetMachine(cfg)
+		local targetmachine = {
+			x86 = "MachineX86",
+			x86_64 = "MachineX64",
+		}
+		local value = targetmachine[cfg.architecture]
+		if (value ~= nil) then
+			m.element("TargetMachine", nil, '%s', value)
 		end
 	end
 
