@@ -90,29 +90,48 @@
 		configurations { "Release", "Debug" }
 		location ( _OPTIONS["to"] )
 
+		flags { "No64BitChecks", "ExtraWarnings", "StaticRuntime", "MultiProcessorCompile" }
+
+		if not _OPTIONS["no-zlib"] then
+			defines { "PREMAKE_COMPRESSION" }
+		end
+		if not _OPTIONS["no-curl"] then
+			defines { "CURL_STATICLIB", "PREMAKE_CURL"}
+		end
+
+		configuration "Debug"
+			defines     "_DEBUG"
+			flags       { "Symbols" }
+
+		configuration "Release"
+			defines     "NDEBUG"
+			optimize    "Full"
+			flags       { "NoBufferSecurityCheck", "NoRuntimeChecks" }
+
+		configuration "vs*"
+			defines     { "_CRT_SECURE_NO_DEPRECATE", "_CRT_SECURE_NO_WARNINGS", "_CRT_NONSTDC_NO_WARNINGS" }
+
+		configuration { "windows", "Release" }
+			flags       { "NoIncrementalLink", "LinkTimeOptimization" }
+
 		configuration { "macosx", "gmake" }
 			buildoptions { "-mmacosx-version-min=10.4" }
 			linkoptions  { "-mmacosx-version-min=10.4" }
-
-		configuration "vs*"
-			defines     { "_CRT_SECURE_NO_WARNINGS", "_CRT_NONSTDC_NO_WARNINGS" }
 
 	project "Premake5"
 		targetname  "premake5"
 		language    "C"
 		kind        "ConsoleApp"
-		flags       { "No64BitChecks", "ExtraWarnings", "StaticRuntime" }
-		includedirs { "src/host/lua/src" }
+		includedirs { "contrib/lua/src" }
+		links       { "lua-lib" }
 
 		-- optional 3rd party libraries
 		if not _OPTIONS["no-zlib"] then
 			includedirs { "contrib/zlib", "contrib/libzip" }
-			defines { "PREMAKE_COMPRESSION" }
 			links { "zip-lib", "zlib-lib" }
 		end
 		if not _OPTIONS["no-curl"] then
 			includedirs { "contrib/curl/include" }
-			defines { "CURL_STATICLIB", "PREMAKE_CURL" }
 			links { "curl-lib" }
 		end
 
@@ -124,28 +143,16 @@
 
 		excludes
 		{
-			"src/host/lua/src/lauxlib.c",
-			"src/host/lua/src/lua.c",
-			"src/host/lua/src/luac.c",
-			"src/host/lua/src/print.c",
-			"src/host/lua/**.lua",
-			"src/host/lua/etc/*.c"
+			"contrib/**.*"
 		}
 
 		configuration "Debug"
 			targetdir   "bin/debug"
-			defines     "_DEBUG"
-			flags       { "Symbols" }
-			debugargs   { "--scripts=" .. path.translate(os.getcwd()) .. " test"}
-			debugdir    ( os.getcwd() )
+			debugargs   { "--scripts=%{prj.location}/%{path.getrelative(prj.location, prj.basedir)} test"}
+			debugdir    "%{path.getrelative(prj.location, prj.basedir)}"
 
 		configuration "Release"
 			targetdir   "bin/release"
-			defines     "NDEBUG"
-			flags       { "OptimizeSize" }
-
-		configuration "vs2005"
-			defines	{"_CRT_SECURE_NO_DEPRECATE" }
 
 		configuration "windows"
 			links       { "ole32", "ws2_32" }
@@ -183,6 +190,7 @@
 
 	-- optional 3rd party libraries
 	group "contrib"
+		include "contrib/lua"
 		if not _OPTIONS["no-zlib"] then
 			include "contrib/zlib"
 			include "contrib/libzip"
