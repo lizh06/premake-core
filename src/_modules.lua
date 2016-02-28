@@ -9,6 +9,8 @@
 		-- "monodevelop",
 		-- "codelite",
 		-- "d",
-		compilationunit,
-		ninja,
+		'compilationunit',
+		'github-package',
+		'ninja',
+		'platform-test',
 	}
