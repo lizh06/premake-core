@@ -9,8 +9,11 @@
 		-- "monodevelop",
 		-- "codelite",
 		-- "d",
+		'autoconf',
 		'compilationunit',
+		'export-compile-commands',
 		'github-package',
 		'ninja',
 		'platform-test',
+		'pkgconfig',
 	}
