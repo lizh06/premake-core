@@ -44,13 +44,14 @@
 		trigger = "test",
 		description = "Run the automated test suite",
 		execute = function ()
-			include (path.join(corePath, "scripts/test.lua"))
+			test = require "self-test"
+			premake.action.call("self-test")
 		end
 	}
 
 
 	newoption {
-		trigger     = "test",
+		trigger     = "test-only",
 		description = "When testing, run only the specified suite or test"
 	}
 
@@ -83,7 +84,10 @@
 -- default when folks build using the makefile. That way they don't have to
 -- worry about the /scripts argument and all that.
 --
--- TODO: defaultConfiguration "Release"
+-- TODO: Switch to these new APIs once they've had a chance to land everywhere
+--
+--    defaultConfiguration "Release"
+--    symbols "On"
 --
 
 	solution "Premake5"
@@ -132,7 +136,7 @@
 		end
 		if not _OPTIONS["no-curl"] then
 			includedirs { "contrib/curl/include" }
-			links { "curl-lib" }
+			links { "curl-lib", "mbedtls-lib" }
 		end
 
 		files
@@ -165,17 +169,9 @@
 		filter "system:linux or hurd"
 			links       { "dl", "rt" }
 
-		filter "system:linux"
-			if not _OPTIONS["no-curl"] and os.findlib("ssl") then
-				links       { "ssl", "crypto" }
-			end
-
 		filter "system:macosx"
 			defines     { "LUA_USE_MACOSX" }
 			links       { "CoreServices.framework" }
-			if not _OPTIONS["no-curl"] then
-				links   { "Security.framework" }
-			end
 
 		filter { "system:macosx", "action:gmake" }
 			toolset "clang"
@@ -196,9 +192,9 @@
 			include "contrib/libzip"
 		end
 		if not _OPTIONS["no-curl"] then
+			include "contrib/mbedtls"
 			include "contrib/curl"
 		end
-
 
 --
 -- A more thorough cleanup.

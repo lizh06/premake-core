@@ -57,7 +57,6 @@
 	end
 
 
-
 --
 -- Output the XML declaration and opening <Project> tag.
 --
@@ -238,6 +237,8 @@
 			m.nmakeCommandLine(cfg, cfg.buildcommands, "Build")
 			m.nmakeCommandLine(cfg, cfg.rebuildcommands, "ReBuild")
 			m.nmakeCommandLine(cfg, cfg.cleancommands, "Clean")
+			m.nmakePreprocessorDefinitions(cfg, cfg.defines, false, nil)
+			m.nmakeIncludeDirs(cfg, cfg.includedirs)
 			p.pop('</PropertyGroup>')
 		end
 	end
@@ -309,7 +310,6 @@
 			m.clCompileAdditionalUsingDirectories,
 			m.forceIncludes,
 			m.debugInformationFormat,
-			m.programDataBaseFileName,
 			m.optimization,
 			m.functionLevelLinking,
 			m.intrinsicFunctions,
@@ -391,12 +391,14 @@
 		if cfg.kind == p.STATICLIB then
 			return {
 				m.subSystem,
+				m.fullProgramDatabaseFile,
 				m.generateDebugInformation,
 				m.optimizeReferences,
 			}
 		else
 			return {
 				m.subSystem,
+				m.fullProgramDatabaseFile,
 				m.generateDebugInformation,
 				m.optimizeReferences,
 				m.additionalDependencies,
@@ -410,6 +412,7 @@
 				m.largeAddressAware,
 				m.targetMachine,
 				m.additionalLinkOptions,
+				m.programDatabaseFile,
 			}
 		end
 	end
@@ -432,6 +435,8 @@
 	m.elements.lib = function(cfg, explicit)
 		if cfg.kind == p.STATICLIB then
 			return {
+				m.additionalDependencies,
+				m.additionalLibraryDirectories,
 				m.treatLinkerWarningAsErrors,
 				m.targetMachine,
 				m.additionalLinkOptions,
@@ -523,11 +528,14 @@
 					local fld = p.rule.getPropertyField(rule, prop)
 					local value = cfg[fld.name]
 					if value ~= nil then
-						if fld.kind == "path" then
+						if fld.kind == "list:path" then
+							value = table.concat(vstudio.path(cfg, value), ';')
+						elseif fld.kind == "path" then
 							value = vstudio.path(cfg, value)
 						else
 							value = p.rule.getPropertyString(rule, prop, value)
 						end
+
 						if value ~= nil and #value > 0 then
 							m.element(prop.name, nil, '%s', value)
 						end
@@ -575,6 +583,15 @@
 	end
 
 
+	function m.generatedFile(cfg, file)
+		if file.generated then
+			local path = path.translate(file.dependsOn.relpath)
+			m.element("AutoGen", nil, 'true')
+			m.element("DependentUpon", nil, path)
+		end
+	end
+
+
 ---
 -- Write out the list of source code files, and any associated configuration.
 ---
@@ -598,7 +615,7 @@
 		priority   = 1,
 
 		emitFiles = function(prj, group)
-			m.emitFiles(prj, group, "ClInclude")
+			m.emitFiles(prj, group, "ClInclude", {m.generatedFile})
 		end,
 
 		emitFilter = function(prj, group)
@@ -638,7 +655,7 @@
 				end
 			end
 
-			m.emitFiles(prj, group, "ClCompile", nil, fileCfgFunc)
+			m.emitFiles(prj, group, "ClCompile", {m.generatedFile}, fileCfgFunc)
 		end,
 
 		emitFilter = function(prj, group)
@@ -655,7 +672,7 @@
 		priority = 3,
 
 		emitFiles = function(prj, group)
-			m.emitFiles(prj, group, "None")
+			m.emitFiles(prj, group, "None", {m.generatedFile})
 		end,
 
 		emitFilter = function(prj, group)
@@ -704,6 +721,7 @@
 				m.excludedFromBuild,
 				m.buildCommands,
 				m.buildOutputs,
+				m.linkObjects,
 				m.buildMessage,
 				m.buildAdditionalInputs
 			}
@@ -1089,6 +1107,13 @@
 	end
 
 
+	function m.linkObjects(fcfg, condition)
+		if fcfg.linkbuildoutputs ~= nil then
+			m.element("LinkObjects", condition, tostring(fcfg.linkbuildoutputs))
+		end
+	end
+
+
 	function m.characterSet(cfg)
 		if not vstudio.isMakefile(cfg) then
 			m.element("CharacterSet", nil, iif(cfg.characterset == p.MBCS, "MultiByte", "Unicode"))
@@ -1166,10 +1191,10 @@
 	function m.debugInformationFormat(cfg)
 		local value
 		local tool, toolVersion = p.config.toolset(cfg)
-		if cfg.flags.Symbols then
+		if (cfg.symbols == p.ON) or (cfg.symbols == "FastLink") then
 			if cfg.debugformat == "c7" then
 				value = "OldStyle"
-			elseif cfg.architecture == "x86_64" or
+			elseif (cfg.architecture == "x86_64" and _ACTION < "vs2015") or
 				   cfg.clr ~= p.OFF or
 				   config.isOptimizedBuild(cfg) or
 				   cfg.editandcontinue == p.OFF or
@@ -1179,9 +1204,10 @@
 			else
 				value = "EditAndContinue"
 			end
-		end
-		if value then
+
 			m.element("DebugInformationFormat", nil, value)
+		elseif cfg.symbols == p.OFF then
+			m.element("DebugInformationFormat", nil, "None")
 		end
 	end
 
@@ -1209,6 +1235,8 @@
 				v = "StreamingSIMDExtensions2"
 			elseif x == "SSE" then
 				v = "StreamingSIMDExtensions"
+			elseif x == "IA32" and _ACTION > "vs2010" then
+				v = "NoExtensions"
 			end
 		end
 		if v then
@@ -1268,6 +1296,7 @@
 		end
 	end
 
+
 	function m.inlineFunctionExpansion(cfg)
 		if cfg.inlining then
 			local types = {
@@ -1279,6 +1308,7 @@
 			m.element("InlineFunctionExpansion", nil, types[cfg.inlining])
 		end
 	end
+
 
 	function m.forceIncludes(cfg, condition)
 		if #cfg.forceincludes > 0 then
@@ -1296,6 +1326,13 @@
 	end
 
 
+	function m.fullProgramDatabaseFile(cfg)
+		if _ACTION >= "vs2015" and cfg.symbols == "FastLink" then
+			m.element("FullProgramDatabaseFile", nil, "true")
+		end
+	end
+
+
 	function m.functionLevelLinking(cfg)
 		if config.isOptimizedBuild(cfg) then
 			m.element("FunctionLevelLinking", nil, "true")
@@ -1304,7 +1341,21 @@
 
 
 	function m.generateDebugInformation(cfg)
-		m.element("GenerateDebugInformation", nil, tostring(cfg.flags.Symbols ~= nil))
+		local lookup = {}
+		if _ACTION >= "vs2015" then
+			lookup[p.ON]       = "true"
+			lookup[p.OFF]      = "false"
+			lookup["FastLink"] = "DebugFastLink"
+		else
+			lookup[p.ON]       = "true"
+			lookup[p.OFF]      = "false"
+			lookup["FastLink"] = "true"
+		end
+
+		local value = lookup[cfg.symbols]
+		if value then
+			m.element("GenerateDebugInformation", nil, value)
+		end
 	end
 
 
@@ -1637,7 +1688,25 @@
 		m.element("NMakeOutput", nil, "$(OutDir)%s", cfg.buildtarget.name)
 	end
 
+	function m.nmakePreprocessorDefinitions(cfg, defines, escapeQuotes, condition)
+		if #defines > 0 then
+			defines = table.concat(defines, ";")
+			if escapeQuotes then
+				defines = defines:gsub('"', '\\"')
+			end
+			defines = p.esc(defines) .. ";$(NMakePreprocessorDefinitions)"
+			m.element('NMakePreprocessorDefinitions', condition, defines)
+		end
+	end
 
+	function m.nmakeIncludeDirs(cfg, includedirs)
+		if #includedirs > 0 then
+			local dirs = vstudio.path(cfg, includedirs)
+			if #dirs > 0 then
+				m.element("NMakeIncludeSearchPath", nil, "%s", table.concat(dirs, ";"))
+			end
+		end
+	end
 
 	function m.objectFileName(fcfg)
 		if fcfg.objname ~= fcfg.basename then
@@ -1761,9 +1830,10 @@
 	end
 
 
-	function m.programDataBaseFileName(cfg)
-		-- just a placeholder for overriding; will use the default VS name
-		-- for changes, see https://github.com/premake/premake-core/issues/151
+	function m.programDatabaseFile(cfg)
+		if cfg.symbolspath and cfg.symbols == p.ON and cfg.debugformat ~= "c7" then
+			m.element("ProgramDatabaseFile", nil, p.project.getrelative(cfg.project, cfg.symbolspath))
+		end
 	end
 
 

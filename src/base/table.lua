@@ -33,6 +33,19 @@
 
 
 --
+-- Make a shallow copy of a table
+--
+
+	function table.shallowcopy(object)
+		local copy = {}
+		for k, v in pairs(object) do
+			copy[k] = v
+		end
+		return copy
+	end
+
+
+--
 -- Make a complete copy of a table, including any child tables it contains.
 --
 
@@ -270,7 +283,7 @@
 			local minindex = 1
 			local maxindex = #tbl + 1
 			while minindex < maxindex do
-				local index = minindex + bit32.arshift(maxindex - minindex, 1)
+				local index = minindex + math.floor((maxindex - minindex) / 2)
 				local test = tbl[index]
 				if fn(value, test) then
 					maxindex = index
@@ -427,7 +440,7 @@
 				return formatting .. '(nil)'
 			elseif type(v) == "table" then
 				if recurse and recurse > 0 then
-					return formatting .. '\n' .. table.tostring(v, recurse-1, i+1) 
+					return formatting .. '\n' .. table.tostring(v, recurse-1, i+1)
 				else
 					return formatting .. "<table>"
 				end
@@ -500,4 +513,22 @@
 				return nil
 			end
 		end)
+	end
+
+
+--
+-- Compares two tables.
+--
+	function table.equals(a, b)
+		for k, v in pairs(a) do
+			if b[k] ~= v then
+				return false
+			end
+		end
+		for k, v in pairs(b) do
+			if a[k] ~= v then
+				return false
+			end
+		end
+		return true
 	end

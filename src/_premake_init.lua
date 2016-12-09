@@ -177,6 +177,12 @@
 	}
 
 	api.register {
+		name = "compilebuildoutputs",
+		scope = "config",
+		kind = "boolean"
+	}
+
+	api.register {
 		name = "configmap",
 		scope = "project",
 		kind = "list:keyed:array:string",
@@ -425,7 +431,7 @@
 	api.register {
 		name = "fileextension",
 		scope = "rule",
-		kind = "string",
+		kind = "list:string",
 	}
 
 	api.register {
@@ -489,7 +495,7 @@
 			"SEH",                 -- DEPRECATED
 			"ShadowedVariables",
 			"StaticRuntime",
-			"Symbols",
+			"Symbols",             -- DEPRECATED
 			"UndefinedIdentifiers",
 			"Unicode",             -- DEPRECATED
 			"Unsafe",              -- DEPRECATED
@@ -497,6 +503,8 @@
 			"WPF",
 			"C++11",
 			"C++14",
+			"C90",
+			"C99",
 		},
 		aliases = {
 			FatalWarnings = { "FatalWarnings", "FatalCompileWarnings", "FatalLinkWarnings" },
@@ -696,6 +704,12 @@
 	}
 
 	api.register {
+		name = "linkbuildoutputs",
+		scope = "config",
+		kind = "boolean"
+	}
+
+	api.register {
 		name = "linkoptions",
 		scope = "config",
 		kind = "list:string",
@@ -707,6 +721,16 @@
 		scope = "config",
 		kind = "list:mixed",
 		tokens = true,
+	}
+
+	api.register {
+		name = "linkgroups",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Off",
+			"On",
+		}
 	}
 
 	api.register {
@@ -777,6 +801,13 @@
 	}
 
 	api.register {
+		name = "runpathdirs",
+		scope = "config",
+		kind = "list:path",
+		tokens = true,
+	}
+
+	api.register {
 		name = "runtime",
 		scope = "config",
 		kind = "string",
@@ -822,6 +853,7 @@
 		kind = "list:string",
 		tokens = true,
 		pathVars = true,
+		allowDuplicates = true,
 	}
 
 	api.register {
@@ -838,6 +870,7 @@
 		kind = "list:string",
 		tokens = true,
 		pathVars = true,
+		allowDuplicates = true,
 	}
 
 	api.register {
@@ -933,6 +966,25 @@
 			"Level2",
 			"Level3",
 		}
+	}
+
+	api.register {
+		name = "symbols",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"On",
+			"Off",
+			"FastLink",    -- Visual Studio 2015+ only, considered 'On' for all other cases.
+		},
+	}
+
+	api.register {
+		name = "symbolspath",
+		scope = "config",
+		kind = "path",
+		tokens = true,
 	}
 
 	api.register {
@@ -1070,6 +1122,7 @@
 			"Default",
 			"AVX",
 			"AVX2",
+			"IA32",
 			"SSE",
 			"SSE2",
 			"SSE3",
@@ -1161,7 +1214,7 @@
 		vectorextensions(value:sub(7))
 	end,
 	function(value)
-		vectorextension "Default"
+		vectorextensions "Default"
 	end)
 
 
@@ -1265,7 +1318,7 @@
 		exceptionhandling "Default"
 	end)
 
-	api.deprecateValue("flags", "Unsafe", nil,
+	api.deprecateValue("flags", "Unsafe", 'Use `clr "Unsafe"` instead',
 	function(value)
 		clr "Unsafe"
 	end,
@@ -1275,12 +1328,22 @@
 
 	-- 18 Dec 2015
 
-	api.deprecateValue("flags", "Unicode", nil,
+	api.deprecateValue("flags", "Unicode", 'Use `characterset "Unicode"` instead',
 	function(value)
 		characterset "Unicode"
 	end,
 	function(value)
 		characterset "Default"
+	end)
+
+	-- 21 June 2016
+
+	api.deprecateValue("flags", "Symbols", 'Use `symbols "On"` instead',
+	function(value)
+		symbols "On"
+	end,
+	function(value)
+		symbols "Default"
 	end)
 
 
@@ -1395,6 +1458,7 @@
 	editorintegration "Off"
 	exceptionhandling "Default"
 	rtti "Default"
+	symbols "Default"
 
 	-- Setting a default language makes some validation easier later
 
@@ -1439,5 +1503,8 @@
 
 	filter { "kind:SharedLib", "system:not Windows" }
 		pic "On"
+
+	filter { "system:macosx" }
+		toolset "clang"
 
 	filter {}
